@@ -79,7 +79,8 @@ Each probe has a corresponding `.read*()` method for results and `.stop*()` wher
 | Script load fails (CORS) | Read `scripts/fiber_sense.js` from skill directory, inject inline via `evaluate_script` |
 | `waterfall()` returns error | Run `network()` or `startOmniWatch()` first |
 | `queryAudit()` returns error | @tanstack/react-query not installed or QueryClientProvider not mounted |
-| `storeRead()` returns empty | Store created outside React — normal for Zustand |
+| `sandbox()` returns error | DOM elements in props cause circular JSON — normal, use `interface()` instead |
+| Manipulation triggers console errors | `inject()`, `mutate()`, `spoof()` modify Fiber directly. React dev mode warns — app behavior unaffected |
 
 ## Common Mistakes
 

@@ -396,6 +396,8 @@ window.FiberSense = (() => {
         },
 
         // --- MANIPULATION & CONTROL ---
+        // ⚠ These modify Fiber internals directly. React dev mode will log warnings.
+        //    App behavior is unaffected. Use for diagnostics only, not in production.
         trigger: (compName, eventName = 'onClick', ...args) => {
             const root = AI.findRoot(); let result = "Not found";
             AI.traverse(root, (f) => {
@@ -554,7 +556,7 @@ window.FiberSense = (() => {
         sandbox: (compName) => {
              const root = AI.findRoot(); let props = null;
              AI.traverse(root, node => { if(AI.getName(node) === compName && node.memoizedProps) props = { ...node.memoizedProps }; });
-             return props ? JSON.stringify(props, null, 2) : "Component not found.";
+             return props ? AI.safeStringify(props, 2000) : "Component not found.";
         },
 
         // --- FUZZING & MONITORING ---
