@@ -1,6 +1,6 @@
 {
   "name": "@nocthulhu/react-fiber-sensing",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "AI-powered React Fiber diagnostics for coding agents with Chrome DevTools MCP",
   "license": "MIT",
   "author": "Ayberk Özden",

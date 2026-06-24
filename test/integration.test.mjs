@@ -1,4 +1,4 @@
-// FiberSense v1.0.0 — Integration Tests (node:test + jsdom)
+// FiberSense v1.0.1 — Integration Tests (node:test + jsdom)
 // Run: npm test
 import { describe, it, before, after } from 'node:test';
 import { strict as assert } from 'node:assert';
@@ -127,9 +127,9 @@ after(() => {
 // ──────────────────────────────────────────────
 
 describe('Lifecycle', () => {
-  it('version() should return v1.0.0', () => {
+  it('version() should return v1.0.1', () => {
     const v = FiberSense.version();
-    assert.strictEqual(v.version, '1.0.0');
+    assert.strictEqual(v.version, '1.0.1');
     assert.ok(v.capabilities.length > 5);
   });
 
@@ -186,7 +186,7 @@ describe('Core diagnostics', () => {
 describe('Performance', () => {
   it('benchmark() should run without error', () => {
     const b = FiberSense.benchmark();
-    assert.strictEqual(b.version, '1.0.0');
+    assert.strictEqual(b.version, '1.0.1');
     assert.ok(b.componentCount > 0);
     assert.ok(typeof b.totalMs === 'number');
     assert.ok(b.verdict === 'FAST' || b.verdict === 'ACCEPTABLE' || b.verdict.includes('SLOW'));

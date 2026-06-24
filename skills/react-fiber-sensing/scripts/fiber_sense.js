@@ -1,5 +1,5 @@
 /**
- * FiberSense V1.0.0 — AI-Powered React Fiber Diagnostics
+ * FiberSense V1.0.1 — AI-Powered React Fiber Diagnostics
  * https://github.com/nocthulhu/react-fiber-sensing
  *
  * @license MIT
@@ -17,7 +17,7 @@ window.FiberSense = (() => {
     const PROD = typeof location !== 'undefined' && !location.hostname.match(/localhost|127\.0\.0\.1|\.local$/) && !document.querySelector('script[data-fibersense="dev"]');
     if (PROD && !(window.FIBERSENSE_PRODUCTION === 'allow')) {
         console.warn('[FiberSense] Production detected. Blocked. Set window.FIBERSENSE_PRODUCTION="allow" to override.');
-        return { version: () => ({ blocked: true, version: '1.0.0', note: 'Production block active. window.FIBERSENSE_PRODUCTION="allow" to enable.' }), blocked: true };
+        return { version: () => ({ blocked: true, version: '1.0.1', note: 'Production block active. window.FIBERSENSE_PRODUCTION="allow" to enable.' }), blocked: true };
     }
     if (window.FiberSense && window.FiberSense.version) return window.FiberSense;
 
@@ -39,9 +39,12 @@ window.FiberSense = (() => {
     }
     const AI = {
         findRoot: () => {
-            const node = document.querySelector('#__next') || document.body;
-            const key = Object.keys(node).find(k => k.startsWith('__reactFiber$') || k.startsWith('__reactContainer$'));
-            return node[key];
+            try {
+                const node = document.querySelector('#__next') || document.querySelector('#root') || document.querySelector('#app') || document.body;
+                if (!node) return null;
+                const key = Object.keys(node).find(k => k.startsWith('__reactFiber$') || k.startsWith('__reactContainer$'));
+                return node[key];
+            } catch(e) { return null; }
         },
         getName: (f) => {
             if (!f) return 'null';
@@ -83,7 +86,8 @@ window.FiberSense = (() => {
             }
         },
         traverse: (f, cb, d=0) => {
-            if (!f || d > 100) return; cb(f, d);
+            if (!f || d > 100) return;
+            try { cb(f, d); } catch(e) {}
             let c = f.child; while(c) { AI.traverse(c, cb, d+1); c = c.sibling; }
         }
     };
@@ -368,9 +372,11 @@ window.FiberSense = (() => {
         },
         omni: (q) => {
             const hits = [];
-            AI.traverse(AI.findRoot(), f => {
+            const ql = (q || '').toLowerCase();
+            AI.traverse(AI.findRoot(), (f, d) => {
+                if (d > 50 || f.tag === 5) return;
                 const s = AI.serialize(f.memoizedState);
-                if(JSON.stringify(s).toLowerCase().includes(q.toLowerCase())) hits.push({ n: AI.getName(f), s });
+                if (JSON.stringify(s).toLowerCase().includes(ql)) hits.push({ n: AI.getName(f), s });
             });
             return hits;
         },
@@ -701,7 +707,7 @@ window.FiberSense = (() => {
         },
         hydration: () => {
             const m = []; AI.traverse(AI.findRoot(), f => {
-                if(f.stateNode && f.tag === 5 && f.memoizedProps?.className && f.stateNode.className !== f.memoizedProps.className) m.push({ n: AI.getName(f), r: f.memoizedProps.className, d: f.stateNode.className });
+                if(f.stateNode && f.tag === 5 && f.memoizedProps?.className != null && String(f.stateNode.className) !== String(f.memoizedProps.className)) m.push({ n: AI.getName(f), r: String(f.memoizedProps.className), d: String(f.stateNode.className) });
             });
             return m;
         },
@@ -734,25 +740,6 @@ window.FiberSense = (() => {
             const key = Object.keys(el).find(k => k.startsWith('__reactFiber$'));
             return el[key] || "Fiber node not found on this element.";
         },
-        spy: (compName, eventName) => {
-            if (!window.__fsEvents) window.__fsEvents = [];
-            let acts = 0;
-            AI.traverse(AI.findRoot(), f => {
-                if (AI.getName(f) === compName && f.memoizedProps) {
-                    const original = f.memoizedProps[eventName];
-                    if (typeof original === 'function' && !original.__isFsProxied) {
-                        f.memoizedProps[eventName] = (...args) => {
-                            window.__fsEvents.unshift({ t: Date.now(), comp: compName, event: eventName, args });
-                            if (window.__fsEvents.length > 50) window.__fsEvents.pop();
-                            return original(...args);
-                        };
-                        f.memoizedProps[eventName].__isFsProxied = true;
-                        acts++;
-                    }
-                }
-            });
-            return `Spy active on ${acts} instances of ${compName}::${eventName}`;
-        },
         listen: (storePath) => {
             // Pattern match for popular stores
             if (!window.__fsNeural) window.__fsNeural = [];
@@ -776,32 +763,28 @@ window.FiberSense = (() => {
         radar: () => {
              const gaps = [];
              AI.traverse(AI.findRoot(), f => {
-                 if (f.tag === 5 && f.stateNode instanceof HTMLElement && f.memoizedProps?.children) {
+                 if (f.tag === 5 && f.stateNode instanceof Element && f.memoizedProps?.children) {
                      const fiberVal = String(f.memoizedProps.children).trim();
-                     const domVal = f.stateNode.innerText.trim();
+                     const domVal = (f.stateNode.textContent || '').trim();
                      if (fiberVal && domVal && fiberVal !== domVal && !fiberVal.includes('[object')) {
-                         gaps.push({ comp: AI.getName(f), fiber: fiberVal, dom: domVal, el: f.stateNode });
+                         gaps.push({ comp: AI.getName(f), fiber: fiberVal.substring(0, 80), dom: domVal.substring(0, 80) });
                      }
                  }
              });
              return gaps;
-        },
+         },
         highlight: () => {
              const gaps = window.FiberSense.radar();
              gaps.forEach(g => {
-                 g.el.style.outline = '2px dashed #f43f5e';
-                 g.el.style.position = 'relative';
-                 const tag = document.createElement('div');
-                 tag.innerText = `! ${g.comp} Sync Gap`;
-                 Object.assign(tag.style, { position: 'absolute', top: '-18px', left: '0', background: '#f43f5e', color: '#fff', fontSize: '10px', padding: '2px 4px', zIndex: '9999' });
-                 g.el.appendChild(tag);
+                 AI.traverse(AI.findRoot(), f => { if (f.tag === 5 && AI.getName(f) === g.comp && f.stateNode instanceof Element && f.stateNode.style) { f.stateNode.style.outline = '2px dashed #f43f5e'; } });
              });
-             return `Highlighted ${gaps.length} anomalies.`;
-        },
+             return `Highlighted ${gaps.length} sync gaps.`;
+         },
         probe: (active = true) => {
              if (!active) {
                  document.removeEventListener('mousemove', window.__fsProbeHandler);
-                 if (window.__fsTooltip) window.__fsTooltip.remove();
+                 if (window.__fsTooltip) { window.__fsTooltip.remove(); window.__fsTooltip = null; }
+                 if (window.__fsProbeTimer) { clearTimeout(window.__fsProbeTimer); window.__fsProbeTimer = null; }
                  return "Probe deactivated.";
              }
              if (!window.__fsTooltip) {
@@ -811,12 +794,12 @@ window.FiberSense = (() => {
              }
              window.__fsProbeHandler = (e) => {
                  const el = document.elementFromPoint(e.clientX, e.clientY);
-                 if (!el) return;
+                 if (!el) { window.__fsTooltip.style.display = 'none'; return; }
                  const key = Object.keys(el).find(k => k.startsWith('__reactFiber$'));
                  const fiber = el[key];
                  if (fiber) {
                      const name = (fiber.type?.name || fiber.type?.displayName || (typeof fiber.type === 'string' ? fiber.type : 'Anonymous'));
-                     window.__fsTooltip.innerHTML = `<b>COMPONENT:</b> ${name}<br><b>SOURCE:</b> ${window.FiberSense.source(name)}`;
+                     window.__fsTooltip.innerHTML = `<b>COMPONENT:</b> ${name}`;
                      window.__fsTooltip.style.top = `${e.clientY + 15}px`;
                      window.__fsTooltip.style.left = `${e.clientX + 15}px`;
                      window.__fsTooltip.style.display = 'block';
@@ -825,8 +808,10 @@ window.FiberSense = (() => {
                  }
              };
              document.addEventListener('mousemove', window.__fsProbeHandler);
-             return "Probe Mode Active: Hover over elements to sense their Fiber.";
-        },
+             if (window.__fsProbeTimer) clearTimeout(window.__fsProbeTimer);
+             window.__fsProbeTimer = setTimeout(() => { window.FiberSense.probe(false); }, 60000);
+             return "Probe Mode Active: Hover over elements to sense their Fiber. Auto-stops in 60s.";
+         },
         reflex: () => {
              const activeHubs = [];
              AI.traverse(AI.findRoot(), f => {
@@ -835,10 +820,11 @@ window.FiberSense = (() => {
                  }
              });
              activeHubs.sort((a,b) => b.dur - a.dur).slice(0, 5).forEach(h => {
-                 window.FiberSense.spy(h.name, 'onClick');
-                 window.FiberSense.spy(h.name, 'onMouseDown');
+                 if (/^(div|span|p|a|img|h[1-6]|button|input|section|header|footer|main|nav|li|ul|ol)$/.test(h.name)) return;
+                 try { window.FiberSense.spy(h.name, 'onClick'); } catch(e) {}
+                 try { window.FiberSense.spy(h.name, 'onMouseDown'); } catch(e) {}
              });
-             return `Autonomous Reflexes enabled. Auto-spying on top 5 active hubs: ${activeHubs.map(h => h.name).join(', ')}`;
+             return `Autonomous Reflexes enabled. Top active hubs: ${activeHubs.filter(h => !/^(div|span|p|a|img|h[1-6]|button|input|section|header|footer|main|nav|li|ul|ol)$/.test(h.name)).slice(0,5).map(h => h.name).join(', ') || 'none'}`;
         },
         echo: (filter = "") => ({
              events: (window.__fsEvents || []).filter(e => !filter || e.comp.includes(filter)),
@@ -869,7 +855,7 @@ window.FiberSense = (() => {
              const safeClone = (obj, d=0) => {
                  if (d > 6) return "[Max Depth]";
                  if (obj === null || typeof obj !== 'object') return obj;
-                 if (obj.$$typeof || typeof obj === 'function' || obj instanceof HTMLElement || obj instanceof Window) return undefined;
+                 if (obj.$$typeof || typeof obj === 'function' || obj instanceof Element || obj instanceof Window) return undefined;
                  if (cache.has(obj)) return undefined; cache.add(obj);
                  if (Array.isArray(obj)) return obj.map(v => safeClone(v, d+1));
                  const clone = {}; for(let k in obj) if(k !== 'current' && !k.startsWith('__')) clone[k] = safeClone(obj[k], d+1);
@@ -966,8 +952,8 @@ window.FiberSense = (() => {
              const hud = document.createElement('div'); hud.id = '__fs_hud';
              Object.assign(hud.style, {
                   position: 'fixed', bottom: '20px', right: '20px', width: '420px',
-                  background: 'rgba(10, 15, 28, 0.98)', color: '#00ffcc', border: '1px solid #334155',
-                  borderRadius: '16px', padding: '0', fontFamily: 'Inter, system-ui, sans-serif', fontSize: '12px',
+                   background: 'rgba(10, 15, 28, 0.98)', color: '#00ffcc',
+                   borderRadius: '16px', padding: '0', fontFamily: 'Inter, system-ui, sans-serif', fontSize: '12px',
                   zIndex: '999999', boxShadow: '0 25px 60px rgba(0,0,0,0.8)', backdropFilter: 'blur(15px)',
                   overflow: 'hidden', display: 'flex', flexDirection: 'column', border: '1px solid rgba(0, 255, 204, 0.2)'
              });
@@ -1053,25 +1039,25 @@ window.FiberSense = (() => {
         },
         // --- FULL-SYSTEM ARCHITECTURE ---
         contextMap: () => {
-            const tree = [];
+            const providers = [], consumers = [];
             AI.traverse(AI.findRoot(), (f, d) => {
-                const isProvider = f.type?.$$typeof === Symbol.for('react.provider') || f.type?._context;
-                const isConsumer = f.dependencies?.firstContext;
-                if (isProvider) {
-                    const ctxName = f.type?._context?.displayName || AI.getName(f);
-                    const consumers = [];
-                    AI.traverse(f.child, c => {
-                        if (c.dependencies?.firstContext) consumers.push(AI.getName(c));
-                    });
-                    tree.push({ type: 'PROVIDER', name: ctxName, depth: d, consumers: [...new Set(consumers)] });
-                } else if (isConsumer) {
+                if (f.type?.$$typeof === Symbol.for('react.provider') || f.type?._context) {
+                    providers.push({ name: f.type?._context?.displayName || AI.getName(f), depth: d, fiber: f });
+                }
+                if (f.dependencies?.firstContext) {
                     let ctx = f.dependencies.firstContext;
                     const consumed = [];
                     while (ctx) { consumed.push(ctx.context?.displayName || 'UnknownCtx'); ctx = ctx.next; }
-                    tree.push({ type: 'CONSUMER', name: AI.getName(f), depth: d, consumes: consumed });
+                    consumers.push({ type: 'CONSUMER', name: AI.getName(f), depth: d, consumes: consumed });
                 }
             });
-            return tree;
+            providers.forEach(p => {
+                const cNames = [];
+                AI.traverse(p.fiber.child, (c) => { if (c.dependencies?.firstContext) cNames.push(AI.getName(c)); });
+                delete p.fiber;
+                consumers.unshift({ type: 'PROVIDER', name: p.name, depth: p.depth, consumers: [...new Set(cNames)] });
+            });
+            return consumers;
         },
         effectAudit: () => {
             const report = [];
@@ -2350,7 +2336,7 @@ window.FiberSense = (() => {
                 if (!r.findings.length) md += `✅ No anomalies. System healthy.\n`;
                 else r.findings.forEach(f => { md += `- **[${f.severity}]** \`${f.what}\`: ${f.why} _(${f.where})_\n`; });
                 if (r.summary.tokenViolations > 0) md += `\n### Visual Debt\n${r.summary.tokenViolations} hardcoded color/px violations bypass the token system.\n`;
-                 md += `\n*Generated by FiberSense V1.0.0 OMNISENSE*`;
+                 md += `\n*Generated by FiberSense V1.0.1 OMNISENSE*`;
             } catch (e) { md = `Narration failed: ${e.message}. Try FiberSense.report() first to validate system state.`; }
             console.log('%c' + md, 'color:#00ffcc; font-family:monospace; font-size:11px;');
             return md;
@@ -2556,8 +2542,10 @@ window.FiberSense = (() => {
                     }
                     const orig = history.pushState;
                     history.pushState = function(...a) { const s=performance.now(); orig.apply(this,a); log('pushState',{url:a[2],ms:Math.round((performance.now()-s)*100)/100}); };
-                    window.addEventListener('popstate', () => log('popstate', { url: location.href }));
+                    const popHandler = () => log('popstate', { url: location.href });
+                    window.addEventListener('popstate', popHandler);
                     window.__fsRouteTiming._origPushState = orig;
+                    window.__fsRouteTiming._popHandler = popHandler;
                     window.__fsRouteTiming.active = true;
                     return { status: 'ACTIVE', mechanism: 'history API' };
                 } catch(e) { return { error: e.message }; }
@@ -2621,15 +2609,15 @@ window.FiberSense = (() => {
 
         benchmark: () => {
             const results = {};
-            const time = (label, fn) => { const s = performance.now(); try { fn(); } catch(e) { return { ms: Math.round((performance.now()-s)*100)/100, error: e.message }; } return { ms: Math.round((performance.now()-s)*100)/100 }; };
-            results.version = '1.0.0';
+            const time = (fn) => { const s = performance.now(); try { fn(); } catch(e) { return { ms: Math.round((performance.now()-s)*100)/100, error: e.message }; } return { ms: Math.round((performance.now()-s)*100)/100 }; };
+            results.version = '1.0.1';
             results.componentCount = (() => { let n = 0; AI.traverse(AI.findRoot(), () => { n++; }); return n; })();
-            results.architectScan = time('architect', () => { const a = window.FiberSense.architect(); results.maxDepth = a.maxDepth; results.heavyRenders = a.heavyRenders.length; });
-            results.scan = time('scan', () => { const s = window.FiberSense.scan(); results.totalComponents = s.metrics?.totalComponents; });
-            results.effectAudit = time('effectAudit', () => { results.effectCount = window.FiberSense.effectAudit().length; });
-            results.report = time('report', () => { const r = window.FiberSense.report(); results.findings = r.findings?.length; });
-            results.heatmap = time('heatmap', () => { results.heatmapSize = window.FiberSense.heatmap().length; });
-            results.contextMap = time('contextMap', () => { results.providers = window.FiberSense.contextMap().length; });
+            results.architectScan = time(() => { const a = window.FiberSense.architect(); results.maxDepth = a.maxDepth; results.heavyRenders = a.heavyRenders.length; });
+            results.scan = time(() => { const s = window.FiberSense.scan(); results.totalComponents = s.metrics?.totalComponents; });
+            results.effectAudit = time(() => { results.effectCount = window.FiberSense.effectAudit().length; });
+            results.report = time(() => { const r = window.FiberSense.report(); results.findings = r.findings?.length; });
+            results.heatmap = time(() => { results.heatmapSize = window.FiberSense.heatmap().length; });
+            results.contextMap = time(() => { results.providers = window.FiberSense.contextMap().length; });
             const times = Object.values(results).filter(v => v && typeof v.ms === 'number').map(v => v.ms);
             results.totalMs = Math.round(times.reduce((a,b) => a+b, 0) * 100) / 100;
             results.avgMs = Math.round((results.totalMs / Math.max(times.length, 1)) * 100) / 100;
@@ -2645,13 +2633,19 @@ window.FiberSense = (() => {
             try { window.FiberSense.stopErrorLog(); cleaned++; } catch(e) {}
             try { window.FiberSense.disableOutputJournal(); cleaned++; } catch(e) {}
             try { window.FiberSense.unmountUI(); cleaned++; } catch(e) {}
-            const globals = ['__fsHudTimer','__fsPulse','__fsSnap','__fsDelta','__fsTimeMachine','__fsTsunami','__fsNetLog','__fsNet','__fsEvents','__fsNeural','__fsAnomalies','__fsVelocity','__fsLongTasks','__fsLongTaskObs','__fsMemory','__fsMemoryStream','__fsOutputJournal','__fsOmni','__fsProbeHandler','__fsTooltip','__fsEventTrace','__fsErrorLog','__fsRouteTiming','__fsActionTrace'];
+            try { window.FiberSense.probe(false); cleaned++; } catch(e) {}
+            if (window.__fsSpyIntervals) { window.__fsSpyIntervals.forEach(id => clearInterval(id)); window.__fsSpyIntervals = []; cleaned++; }
+            if (window.__fsLongTaskObs) { try { window.__fsLongTaskObs.disconnect(); } catch(e) {} window.__fsLongTaskObs = null; cleaned++; }
+            if (window.__fsRouteTiming && window.__fsRouteTiming._origPushState) { try { history.pushState = window.__fsRouteTiming._origPushState; } catch(e) {} cleaned++; }
+            if (window.__fsRouteTiming && window.__fsRouteTiming._popHandler) { try { window.removeEventListener('popstate', window.__fsRouteTiming._popHandler); } catch(e) {} cleaned++; }
+            if (window.__fsProbeTimer) { clearTimeout(window.__fsProbeTimer); window.__fsProbeTimer = null; }
+            const globals = ['__fsHudTimer','__fsPulse','__fsSnap','__fsDelta','__fsTimeMachine','__fsTsunami','__fsNetLog','__fsNet','__fsEvents','__fsNeural','__fsAnomalies','__fsVelocity','__fsLongTasks','__fsLongTaskObs','__fsMemory','__fsMemoryStream','__fsOutputJournal','__fsOmni','__fsProbeHandler','__fsProbeTimer','__fsTooltip','__fsEventTrace','__fsErrorLog','__fsRouteTiming','__fsActionTrace','__fsSpyIntervals'];
             globals.forEach(k => { try { delete window[k]; cleaned++; } catch(e) {} });
             return { status: 'DESTROYED', cleaned };
         },
 
         version: () => ({
-            version: '1.0.0',
+            version: '1.0.1',
             codename: 'OMNISENSE',
             capabilities: [
                 'Core: architect, dump(legacy), heatmap, scan, track, source, omni',
@@ -2879,7 +2873,9 @@ window.FiberSense = (() => {
             let prev = undefined;
             let ticks = 0;
             const changes = [];
-            console.log(`%c[SPY] Watching ${compName}.${propName || '*'} every ${intervalMs}ms. Call FiberSense._stopSpy() to stop.`, 'color:#facc15;font-weight:bold;');
+            if (!window.__fsSpyIntervals) window.__fsSpyIntervals = [];
+            const safeSerialize = (v) => { try { if (typeof v === 'function') return '[fn]'; if (v && typeof v === 'object' && v.$$typeof) return '[ReactElement]'; return JSON.stringify(v); } catch { return String(v).substring(0, 120); } };
+            console.log(`%c[SPY] Watching ${compName}.${propName || '*'} every ${intervalMs}ms.`, 'color:#facc15;font-weight:bold;');
             const id = setInterval(() => {
                 ticks++;
                 let found = null;
@@ -2887,19 +2883,20 @@ window.FiberSense = (() => {
                 if (!found) return;
                 const props = found.memoizedProps;
                 const val = propName ? props[propName] : props;
-                const serialized = (() => { try { return JSON.stringify(val); } catch { return String(val); } })();
-                const prevSerialized = (() => { try { return JSON.stringify(prev); } catch { return String(prev); } })();
+                const serialized = safeSerialize(val);
+                const prevSerialized = prev === undefined ? undefined : safeSerialize(prev);
                 if (serialized !== prevSerialized) {
-                    const entry = { tick: ticks, timestamp: Date.now(), prop: propName || 'ALL_PROPS', from: prevSerialized?.substring(0, 120), to: serialized?.substring(0, 120) };
+                    const entry = { tick: ticks, timestamp: Date.now(), prop: propName || 'ALL_PROPS', from: (prevSerialized||'').substring(0, 120), to: (serialized||'').substring(0, 120) };
                     changes.push(entry);
                     console.log(`%c[SPY] ${compName}.${propName || '*'} CHANGED:`, 'color:#f87171;font-weight:bold;', entry);
-                    prev = JSON.parse(serialized);
+                    try { prev = serialized && serialized !== 'undefined' ? JSON.parse(serialized) : val; } catch { prev = val; }
                 } else {
-                    prev = JSON.parse(serialized);
+                    try { prev = serialized && serialized !== 'undefined' ? JSON.parse(serialized) : val; } catch { prev = val; }
                 }
             }, intervalMs);
-            window.FiberSense._stopSpy = () => { clearInterval(id); console.log(`%c[SPY] Stopped after ${ticks} ticks. ${changes.length} changes detected.`, 'color:#4ade80;font-weight:bold;'); return changes; };
-            return { status: 'WATCHING', component: compName, prop: propName || '*', interval: intervalMs, stop: 'FiberSense._stopSpy()' };
+            window.__fsSpyIntervals.push(id);
+            window.FiberSense._stopSpy = () => { clearInterval(id); window.__fsSpyIntervals = window.__fsSpyIntervals.filter(x => x !== id); console.log(`%c[SPY] Stopped after ${ticks} ticks. ${changes.length} changes detected.`, 'color:#4ade80;font-weight:bold;'); return changes; };
+            return { status: 'WATCHING', component: compName, prop: propName || '*', interval: intervalMs };
         },
         zombieScan: () => {
             const zombies = [];
@@ -2946,4 +2943,4 @@ try {
 } catch (e) {}
 
 if (typeof module !== 'undefined' && module.exports) module.exports = window.FiberSense;
-console.log("FiberSense V1.0.0 OMNISENSE Active. Start: FiberSense.diagnose('your symptom')");
+console.log("FiberSense V1.0.1 OMNISENSE Active. Start: FiberSense.diagnose('your symptom')");

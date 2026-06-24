@@ -1,4 +1,4 @@
-// TypeScript definitions for FiberSense V1.0.0
+// TypeScript definitions for FiberSense V1.0.1
 // https://github.com/nocthulhu/react-fiber-sensing
 
 interface FiberSenseFinding {

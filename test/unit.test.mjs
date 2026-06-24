@@ -1,4 +1,4 @@
-// FiberSense V1.0.0 — Unit Tests (node:test + jsdom)
+// FiberSense V1.0.1 — Unit Tests (node:test + jsdom)
 // Run: node --test test/fiber_sense.test.mjs
 
 import { describe, it } from 'node:test';
@@ -322,8 +322,8 @@ describe('Production guard', () => {
 // ──────────────────────────────────────────────
 
 describe('Version contract', () => {
-  it('source should contain V1.0.0', () => {
-    assert.ok(source.includes('V1.0.0') || source.includes('1.0.0'));
+  it('source should contain V1.0.1', () => {
+    assert.ok(source.includes('V1.0.1') || source.includes('1.0.1'));
   });
 
   it('source should contain MIT license', () => {
