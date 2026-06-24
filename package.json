@@ -1,0 +1,30 @@
+{
+  "name": "@nocthulhu/react-fiber-sensing",
+  "version": "1.0.0",
+  "description": "AI-powered React Fiber diagnostics for coding agents with Chrome DevTools MCP",
+  "license": "MIT",
+  "author": "Ayberk Özden",
+  "repository": "github:nocthulhu/react-fiber-sensing",
+  "keywords": [
+    "react",
+    "fiber",
+    "diagnostics",
+    "debugging",
+    "mcp",
+    "ai-agent",
+    "chrome-devtools",
+    "performance"
+  ],
+  "type": "module",
+  "files": [
+    "skills/"
+  ],
+  "scripts": {
+    "test": "node --test test/unit.test.mjs test/integration.test.mjs",
+    "test:unit": "node --test test/unit.test.mjs",
+    "test:integration": "node --test test/integration.test.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0"
+  }
+}

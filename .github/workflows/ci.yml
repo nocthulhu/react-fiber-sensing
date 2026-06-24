@@ -1,0 +1,23 @@
+name: CI
+
+on:
+ push:
+  branches: [master, main]
+ pull_request:
+  branches: [master, main]
+
+jobs:
+ test:
+  runs-on: ubuntu-latest
+  steps:
+   - uses: actions/checkout@v4
+   - uses: actions/setup-node@v4
+    with:
+     node-version: '22'
+   - run: npm ci
+   - run: npm test
+   - name: Security checks
+    run: |
+     grep -q "FIBERSENSE_PRODUCTION" skills/react-fiber-sensing/scripts/fiber_sense.js || (echo "Missing production guard"; exit 1)
+     grep -q "sanitizeValue" skills/react-fiber-sensing/scripts/fiber_sense.js || (echo "Missing sanitizeValue"; exit 1)
+     echo "Security checks passed"
