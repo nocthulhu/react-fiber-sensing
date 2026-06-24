@@ -69,6 +69,26 @@ Injects `fiber_sense.js` into the browser to read React Fiber tree directly. Rep
 
 Each probe has a corresponding `.read*()` method for results and `.stop*()` where applicable.
 
+### Full-API Reference
+
+All 60+ methods organized by what you want to do:
+
+| What you want | Commands |
+|---------------|----------|
+| **Audit everything** | `agentEyes("")`, `fullAudit("")`, `report()`, `narrate()`, `benchmark()` |
+| **Find what's slow** | `scan()`, `heatmap()`, `renderCascade()`, `architect()`, `velocityWatch("Comp", ms)` |
+| **Understand state** | `dump()`, `storeRead()`, `zombieScan()`, `sandbox("Comp")`, `interface("Comp")`, `memorize("label")`, `compareMemory("a","b")` |
+| **Trace effects/hooks** | `effectAudit()`, `layoutEffectAudit()`, `memoScan()`, `staleClosures()` |
+| **Map architecture** | `contextMap()`, `routeMap()`, `rscMap()`, `errorBoundaryMap()`, `suspenseMap()`, `laneMap()` |
+| **Debug re-renders** | `rerenderReason("Comp")`, `propDiff("Comp")`, `source("Comp")`, `debugOwner("Comp")`, `track("Comp")` |
+| **Security & a11y** | `xssAudit()`, `a11y()`, `tokenAudit()`, `leaks()` |
+| **Network & data** | `network()`, `waterfall()`, `queryAudit()`, `invalidateQuery("key")`, `cache()` |
+| **Live monitoring** | `eventTrace("Comp", ms)`, `errorLog()`, `actionTrace()`, `routeTiming()` (+ their `.read*()` methods) |
+| **Time-travel** | `record("Comp","event")`, `rewind(steps)`, `replay()`, `chronosDump()`, `snap()`, `diff()` |
+| **Interactive** | `probe(on/off)`, `reflex()`, `spy("Comp","prop",ms)`, `discoverIntent("selection")`, `mountUI()`, `unmountUI()` |
+| **Manipulation** ⚠ | `trigger("Comp","event")`, `inject("Comp",idx,val)`, `spoof("Provider",val)`, `mutate("Comp",props)` — React dev mode warns |
+| **Cleanup** | `destroy()`, `stopOmniWatch()`, `stopPulse()`, `stopErrorLog()`, `heal()` |
+
 ## Error Handling
 
 | Problem | Action |
